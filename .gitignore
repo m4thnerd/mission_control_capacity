@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+
+# Local runtime data is stored outside the repository, but keep accidental
+# diagnostic captures and environment files out of commits as a safeguard.
+.env
+.env.*
+capacity-snapshot.json
+*.log
