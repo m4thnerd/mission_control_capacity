@@ -21,6 +21,10 @@ let package = Package(
         .executableTarget(
             name: "capacityctl",
             dependencies: ["CapacityCore"]
+        ),
+        .testTarget(
+            name: "CapacityCoreTests",
+            dependencies: ["CapacityCore"]
         )
     ]
 )

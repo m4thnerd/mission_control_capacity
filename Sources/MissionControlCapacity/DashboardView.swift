@@ -150,8 +150,8 @@ private struct ProviderCard: View {
             } else {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     VStack(spacing: 8) {
-                        if hasUnreportedFiveHour {
-                            UnreportedWindowRow()
+                        if let unreportedFiveHour {
+                            UnreportedWindowRow(label: unreportedFiveHour.label)
                         }
                         ForEach(snapshot.windows) { window in
                             CapacityWindowRow(window: window, now: context.date, tint: providerColor)
@@ -206,12 +206,14 @@ private struct ProviderCard: View {
         }
     }
 
-    private var hasUnreportedFiveHour: Bool {
-        snapshot.metrics.contains { $0.label == "5-hour" && $0.value == "Not reported" }
+    private var unreportedFiveHour: CapacityMetric? {
+        snapshot.metrics.first {
+            $0.id == "openai-account-wide-5-hour-unreported" && $0.value == "Not reported"
+        }
     }
 
     private var displayMetrics: [CapacityMetric] {
-        snapshot.metrics.filter { $0.label != "5-hour" }
+        snapshot.metrics.filter { $0.id != "openai-account-wide-5-hour-unreported" }
     }
 
     private func displayPlan(_ plan: String) -> String {
@@ -228,11 +230,14 @@ private struct ProviderCard: View {
 }
 
 private struct UnreportedWindowRow: View {
+    let label: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("5 hours")
+                Text(label)
                     .font(.caption.weight(.semibold))
+                    .lineLimit(2)
                 Spacer()
                 Text("Not reported")
                     .font(.caption2.weight(.semibold))
@@ -241,7 +246,7 @@ private struct UnreportedWindowRow: View {
             Capsule()
                 .fill(.quaternary)
                 .frame(height: 4)
-            Text("Codex does not expose this window")
+            Text("Not returned by the provider")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
@@ -260,7 +265,7 @@ private struct CapacityWindowRow: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(window.label)
                     .font(.caption.weight(.semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Spacer()
                 Text(percentLabel)
                     .font(.system(.caption, design: .rounded, weight: .bold))

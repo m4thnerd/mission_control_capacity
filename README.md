@@ -71,6 +71,18 @@ Build a menu-bar app bundle:
 open ".build/Mission Control Capacity.app"
 ```
 
+Run the unit tests:
+
+```bash
+swift test
+```
+
+On a Mac with only the Command Line Tools (no Xcode), the toolchain does not load the Swift Testing macro plugin on its own. Pass its path explicitly:
+
+```bash
+swift test -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
+```
+
 The bundle uses `LSUIElement`, so it appears in the menu bar without occupying the Dock. Clicking **Open Dashboard** opens a persistent window. Provider data polls in the background every 10 minutes and is stored locally in `~/Library/Application Support/Mission Control Capacity/capacity-snapshot.json`, so reopening the widget is instant. Failed providers retry after one minute. Their last good measurements remain visible but are explicitly marked stale; the refresh button still forces an immediate poll.
 
 ## Notes

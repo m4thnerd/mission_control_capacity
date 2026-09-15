@@ -133,21 +133,27 @@ public enum UsageParsers {
         var windows: [CapacityWindow] = []
         var detectedPlan: String?
 
-        // Direct Codex capacity is the `codex` limit. Model-specific pools such as
-        // Bengalfox/Spark are intentionally excluded from the human dashboard.
-        for (limitID, snapshot) in limits.sorted(by: { $0.key < $1.key }) where limitID == "codex" {
+        let sortedLimits = limits.sorted { lhs, rhs in
+            if lhs.key == rhs.key { return false }
+            if lhs.key == "codex" { return true }
+            if rhs.key == "codex" { return false }
+            let lhsName = openAILimitLabel(id: lhs.key, snapshot: lhs.value)
+            let rhsName = openAILimitLabel(id: rhs.key, snapshot: rhs.value)
+            let comparison = lhsName.localizedCaseInsensitiveCompare(rhsName)
+            return comparison == .orderedSame ? lhs.key < rhs.key : comparison == .orderedAscending
+        }
+
+        for (limitID, snapshot) in sortedLimits {
             detectedPlan = detectedPlan ?? (snapshot["planType"] as? String).map(titleCase)
-            let limitName = snapshot["limitName"] as? String
+            let poolLabel = openAILimitLabel(id: limitID, snapshot: snapshot)
             for (slot, key) in [("primary", "primary"), ("secondary", "secondary")] {
                 guard let window = snapshot[key] as? [String: Any],
                       let used = number(window["usedPercent"]) else { continue }
                 let duration = integer(window["windowDurationMins"])
                 let resetEpoch = integer(window["resetsAt"])
-                let baseLabel = durationLabel(duration)
-                let label = limitName.map { "\($0) · \(baseLabel)" } ?? baseLabel
                 windows.append(CapacityWindow(
                     id: "\(limitID)-\(slot)",
-                    label: label,
+                    label: "\(poolLabel) · \(durationLabel(duration))",
                     usedPercent: used,
                     durationMinutes: duration,
                     resetsAt: resetEpoch.map { Date(timeIntervalSince1970: TimeInterval($0)) }
@@ -157,8 +163,15 @@ public enum UsageParsers {
 
         guard !windows.isEmpty else { throw ParserError.missingUsage("OpenAI") }
         var metrics: [CapacityMetric] = []
-        if !windows.contains(where: { $0.durationMinutes == 300 }) {
-            metrics.append(CapacityMetric(label: "5-hour", value: "Not reported"))
+        let accountWideHasFiveHour = windows.contains {
+            $0.id.hasPrefix("codex-") && $0.durationMinutes == 300
+        }
+        if limits["codex"] != nil, !accountWideHasFiveHour {
+            metrics.append(CapacityMetric(
+                id: "openai-account-wide-5-hour-unreported",
+                label: "Codex account-wide · 5 hours",
+                value: "Not reported"
+            ))
         }
         if let resetCredits = result["rateLimitResetCredits"] as? [String: Any],
            let count = integer(resetCredits["availableCount"]), count > 0 {
@@ -210,6 +223,18 @@ public enum UsageParsers {
         case .some(let value): "\(value) minutes"
         case nil: "Usage"
         }
+    }
+
+    private static func openAILimitLabel(id: String, snapshot: [String: Any]) -> String {
+        if id == "codex" { return "Codex account-wide" }
+        if let name = snapshot["limitName"] as? String {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        return id
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .capitalized
     }
 
     private static func titleCase(_ value: String) -> String {

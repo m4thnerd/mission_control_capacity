@@ -115,8 +115,15 @@ public struct PTYUsageProbe: Sendable {
 
     private static var probeWorkingDirectory: String {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        let development = home.appendingPathComponent("dev", isDirectory: true)
-        return FileManager.default.fileExists(atPath: development.path) ? development.path : home.path
+        let workspace = home
+            .appendingPathComponent("Library/Application Support", isDirectory: true)
+            .appendingPathComponent("Mission Control Capacity", isDirectory: true)
+            .appendingPathComponent("ProbeWorkspace", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: workspace,
+            withIntermediateDirectories: true
+        )
+        return workspace.path
     }
 
     private static let interactiveProbeScript = #"""

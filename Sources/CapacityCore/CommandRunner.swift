@@ -26,13 +26,19 @@ public struct ExecutableLocator: Sendable {
 
     public func locate(_ name: String) -> URL? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let bundledCandidates: [String] = switch name {
+        case "codex":
+            ["/Applications/ChatGPT.app/Contents/Resources/codex"]
+        default:
+            []
+        }
         let candidates = [
             "\(home)/.local/bin/\(name)",
             "/opt/homebrew/bin/\(name)",
             "/usr/local/bin/\(name)",
             "/usr/bin/\(name)",
             "/bin/\(name)"
-        ]
+        ] + bundledCandidates
 
         return candidates.first(where: FileManager.default.isExecutableFile(atPath:)).map {
             URL(fileURLWithPath: $0)
