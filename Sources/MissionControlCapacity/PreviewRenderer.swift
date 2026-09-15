@@ -16,7 +16,7 @@ enum PreviewRenderer {
         let view = DashboardView(store: store, compact: true, staticLayout: true)
             .frame(width: 430)
             .fixedSize(horizontal: false, vertical: true)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(ConsoleTheme.background)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
 

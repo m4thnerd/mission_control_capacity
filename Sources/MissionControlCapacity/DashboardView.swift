@@ -2,6 +2,22 @@ import AppKit
 import CapacityCore
 import SwiftUI
 
+/// Dark instrument-panel palette shared by the dashboard views.
+enum ConsoleTheme {
+    static let background = Color(red: 0.055, green: 0.075, blue: 0.105)
+    static let panel = Color.white.opacity(0.045)
+    static let grid = Color.white.opacity(0.035)
+    static let hairline = Color.white.opacity(0.10)
+    static let primary = Color.white.opacity(0.92)
+    static let secondary = Color.white.opacity(0.60)
+    static let tertiary = Color.white.opacity(0.40)
+    static let track = Color.white.opacity(0.09)
+
+    static func mono(_ style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
+        .system(style, design: .monospaced).weight(weight)
+    }
+}
+
 struct DashboardView: View {
     @ObservedObject var store: CapacityStore
     let compact: Bool
@@ -11,18 +27,23 @@ struct DashboardView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            if staticLayout {
-                cardGrid
-            } else {
-                ScrollView { cardGrid }
+        ZStack {
+            ConsoleTheme.background
+            GridBackdrop()
+            VStack(spacing: 0) {
+                header
+                Rectangle().fill(ConsoleTheme.hairline).frame(height: 1)
+                if staticLayout {
+                    cardGrid
+                } else {
+                    ScrollView { cardGrid }
+                }
+                Rectangle().fill(ConsoleTheme.hairline).frame(height: 1)
+                footer
             }
-            Divider()
-            footer
         }
-        .background(.regularMaterial)
+        .foregroundStyle(ConsoleTheme.primary)
+        .preferredColorScheme(.dark)
     }
 
     private var cardGrid: some View {
@@ -45,26 +66,31 @@ struct DashboardView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: "dot.radiowaves.left.and.right")
-                .font(.title2)
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.title3)
                 .foregroundStyle(.cyan)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Mission Control: Capacity")
-                    .font(.headline)
+                .shadow(color: .cyan.opacity(0.7), radius: 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("MISSION CONTROL")
+                    .font(ConsoleTheme.mono(.subheadline, weight: .bold))
+                    .tracking(2)
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(refreshLabel(now: context.date))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("CAPACITY · \(refreshLabel(now: context.date))")
+                        .font(ConsoleTheme.mono(.caption2))
+                        .tracking(0.8)
+                        .foregroundStyle(ConsoleTheme.secondary)
                 }
             }
             Spacer()
             if store.isRefreshing {
                 ProgressView().controlSize(.small)
             }
+            StatusPill(status: systemStatus)
             Button {
                 Task { await store.refresh() }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .foregroundStyle(ConsoleTheme.secondary)
             }
             .buttonStyle(.plain)
             .help("Refresh all providers")
@@ -76,35 +102,120 @@ struct DashboardView: View {
     private var footer: some View {
         HStack {
             if compact {
-                Button("Open Dashboard") {
+                Button("OPEN DASHBOARD") {
                     openWindow(id: "dashboard")
                     NSApp.activate(ignoringOtherApps: true)
                 }
             }
             Spacer()
-            Text("10m polling")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Text("POLL 10M")
+                .foregroundStyle(ConsoleTheme.tertiary)
             if compact {
-                Button("Quit") { NSApp.terminate(nil) }
+                Button("QUIT") { NSApp.terminate(nil) }
             }
         }
+        .font(ConsoleTheme.mono(.caption2, weight: .semibold))
+        .tracking(0.8)
         .buttonStyle(.borderless)
+        .tint(ConsoleTheme.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
     }
 
+    private var systemStatus: SystemStatus {
+        if store.snapshots.contains(where: { $0.state == .error || $0.state == .unauthenticated }) {
+            return .attention
+        }
+        if store.snapshots.contains(where: { $0.state == .loading }) {
+            return .syncing
+        }
+        return .nominal
+    }
+
     private func refreshLabel(now: Date) -> String {
-        guard let date = store.lastRefresh else { return "Preparing first snapshot…" }
+        guard let date = store.lastRefresh else { return "FIRST SNAPSHOT PENDING" }
         let seconds = max(0, Int(now.timeIntervalSince(date)))
-        if seconds < 60 { return "Last checked just now" }
-        if seconds < 3_600 { return "Last checked \(seconds / 60)m ago" }
-        if seconds < 86_400 { return "Last checked \(seconds / 3_600)h ago" }
-        return "Last checked \(seconds / 86_400)d ago"
+        if seconds < 60 { return "CHECKED JUST NOW" }
+        if seconds < 3_600 { return "CHECKED \(seconds / 60)M AGO" }
+        if seconds < 86_400 { return "CHECKED \(seconds / 3_600)H AGO" }
+        return "CHECKED \(seconds / 86_400)D AGO"
     }
 
     private var visibleSnapshots: [ProviderSnapshot] {
         store.snapshots.filter { $0.id != .xAI }
+    }
+}
+
+private enum SystemStatus {
+    case nominal, syncing, attention
+
+    var label: String {
+        switch self {
+        case .nominal: "NOMINAL"
+        case .syncing: "SYNCING"
+        case .attention: "ATTENTION"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .nominal: .green
+        case .syncing: .cyan
+        case .attention: .orange
+        }
+    }
+}
+
+private struct StatusPill: View {
+    let status: SystemStatus
+
+    var body: some View {
+        HStack(spacing: 5) {
+            GlowDot(color: status.color)
+            Text(status.label)
+                .font(ConsoleTheme.mono(.caption2, weight: .bold))
+                .tracking(1)
+        }
+        .foregroundStyle(status.color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(status.color.opacity(0.10), in: Capsule())
+        .overlay(Capsule().stroke(status.color.opacity(0.45), lineWidth: 1))
+    }
+}
+
+private struct GlowDot: View {
+    let color: Color
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+            .shadow(color: color.opacity(0.9), radius: 4)
+    }
+}
+
+/// Faint engineering grid behind the panels.
+private struct GridBackdrop: View {
+    var body: some View {
+        Canvas { context, size in
+            let step: CGFloat = 28
+            var path = Path()
+            var x: CGFloat = 0
+            while x <= size.width {
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+                x += step
+            }
+            var y: CGFloat = 0
+            while y <= size.height {
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                y += step
+            }
+            context.stroke(path, with: .color(ConsoleTheme.grid), lineWidth: 0.5)
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -113,36 +224,39 @@ private struct ProviderCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 7, height: 7)
-                Text(snapshot.id.shortName)
-                    .font(.callout.weight(.bold))
+            HStack(spacing: 7) {
+                GlowDot(color: statusColor)
+                Text(snapshot.id.shortName.uppercased())
+                    .font(ConsoleTheme.mono(.callout, weight: .bold))
+                    .tracking(1)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 if let plan = snapshot.plan, !plan.isEmpty {
-                    Text(displayPlan(plan))
-                        .font(.caption2.weight(.semibold))
+                    Text(displayPlan(plan).uppercased())
+                        .font(ConsoleTheme.mono(.caption2, weight: .semibold))
+                        .foregroundStyle(providerColor)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
+                        .background(providerColor.opacity(0.12), in: Capsule())
+                        .overlay(Capsule().stroke(providerColor.opacity(0.4), lineWidth: 1))
                 }
                 Spacer()
                 if snapshot.state != .connected {
-                    Text(snapshot.state.label)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    Text(snapshot.state.label.uppercased())
+                        .font(ConsoleTheme.mono(.caption2))
+                        .foregroundStyle(statusColor)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
             }
 
             if snapshot.state == .error, !snapshot.windows.isEmpty {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     Label(staleLabel(now: context.date), systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption2.weight(.semibold))
+                        .font(ConsoleTheme.mono(.caption2, weight: .semibold))
                         .foregroundStyle(.orange)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.7)
                         .help(snapshot.message ?? "The latest refresh failed.")
                 }
             }
@@ -154,12 +268,12 @@ private struct ProviderCard: View {
             } else if snapshot.windows.isEmpty {
                 Text(snapshot.message ?? "No quota windows were returned.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ConsoleTheme.secondary)
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    VStack(spacing: 8) {
+                    VStack(spacing: 9) {
                         if let unreportedFiveHour {
                             UnreportedWindowRow(label: unreportedFiveHour.label)
                         }
@@ -170,19 +284,19 @@ private struct ProviderCard: View {
                 }
 
                 if !displayMetrics.isEmpty {
-                    Divider()
+                    Rectangle().fill(ConsoleTheme.hairline).frame(height: 1)
                     VStack(spacing: 3) {
                         ForEach(displayMetrics) { metric in
                             HStack(spacing: 6) {
-                                Text(metric.label)
-                                    .foregroundStyle(.secondary)
+                                Text(metric.label.uppercased())
+                                    .foregroundStyle(ConsoleTheme.secondary)
                                 Spacer(minLength: 4)
-                                Text(metric.value)
+                                Text(metric.value.uppercased())
                                     .fontWeight(.semibold)
                             }
                         }
                     }
-                    .font(.caption2)
+                    .font(ConsoleTheme.mono(.caption2))
                 }
             }
             Spacer(minLength: 0)
@@ -190,17 +304,18 @@ private struct ProviderCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.background.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(ConsoleTheme.panel, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(providerColor.opacity(0.6), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(providerColor.opacity(0.6), lineWidth: 1)
         }
+        .shadow(color: providerColor.opacity(0.22), radius: 10)
     }
 
     private var statusColor: Color {
         switch snapshot.state {
         case .connected: .green
-        case .loading: .blue
+        case .loading: .cyan
         case .unauthenticated: .orange
         case .unavailable: .gray
         case .error: .red
@@ -233,10 +348,10 @@ private struct ProviderCard: View {
 
     private func staleLabel(now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(snapshot.updatedAt)))
-        if seconds < 60 { return "Stale · last good update just now" }
-        if seconds < 3_600 { return "Stale · last good update \(seconds / 60)m ago" }
-        if seconds < 86_400 { return "Stale · last good update \(seconds / 3_600)h ago" }
-        return "Stale · last good update \(seconds / 86_400)d ago"
+        if seconds < 60 { return "STALE · LAST GOOD JUST NOW" }
+        if seconds < 3_600 { return "STALE · LAST GOOD \(seconds / 60)M AGO" }
+        if seconds < 86_400 { return "STALE · LAST GOOD \(seconds / 3_600)H AGO" }
+        return "STALE · LAST GOOD \(seconds / 86_400)D AGO"
     }
 }
 
@@ -250,8 +365,8 @@ private struct BestForSection: View {
                 Image(systemName: "scope")
                     .font(.system(size: 9, weight: .bold))
                 Text("BEST FOR")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.8)
+                    .font(ConsoleTheme.mono(.caption2, weight: .bold))
+                    .tracking(1)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(tint)
@@ -261,19 +376,50 @@ private struct BestForSection: View {
                 .minimumScaleFactor(0.85)
             ForEach(guide.bestFor, id: \.self) { item in
                 HStack(alignment: .top, spacing: 4) {
-                    Text("•")
+                    Text("›").foregroundStyle(tint)
                     Text(item)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ConsoleTheme.secondary)
                 .lineLimit(2)
             }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(tint.opacity(0.18), lineWidth: 1)
+        )
         .help("What this provider's models are generally known to be strongest at. Use it to pick where the next project goes, or where to shift when a limit runs out.")
+    }
+}
+
+/// Thin gauge with quarter tick marks and a glowing fill.
+private struct GaugeBar: View {
+    let value: Double
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(ConsoleTheme.track)
+                if value > 0 {
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: max(5, proxy.size.width * value / 100))
+                        .shadow(color: tint.opacity(0.7), radius: 3)
+                }
+                ForEach([0.25, 0.5, 0.75], id: \.self) { fraction in
+                    Rectangle()
+                        .fill(ConsoleTheme.background.opacity(0.9))
+                        .frame(width: 1)
+                        .offset(x: proxy.size.width * fraction)
+                }
+            }
+        }
+        .frame(height: 5)
     }
 }
 
@@ -282,23 +428,21 @@ private struct UnreportedWindowRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.caption.weight(.semibold))
+            HStack(alignment: .firstTextBaseline) {
+                Text(label.uppercased())
+                    .font(ConsoleTheme.mono(.caption2, weight: .semibold))
                     .lineLimit(2)
                 Spacer()
-                Text("Not reported")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text("NO DATA")
+                    .font(ConsoleTheme.mono(.caption2, weight: .bold))
+                    .foregroundStyle(ConsoleTheme.tertiary)
             }
-            Capsule()
-                .fill(.quaternary)
-                .frame(height: 4)
-            Text("Not returned by the provider")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            GaugeBar(value: 0, tint: .clear)
+            Text("NOT RETURNED BY PROVIDER")
+                .font(ConsoleTheme.mono(.caption2))
+                .foregroundStyle(ConsoleTheme.tertiary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.7)
         }
     }
 }
@@ -311,30 +455,28 @@ private struct CapacityWindowRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(window.label)
-                    .font(.caption.weight(.semibold))
+                Text(window.label.uppercased())
+                    .font(ConsoleTheme.mono(.caption2, weight: .semibold))
                     .lineLimit(2)
                 Spacer()
                 Text(percentLabel)
-                    .font(.system(.caption, design: .rounded, weight: .bold))
+                    .font(ConsoleTheme.mono(.caption, weight: .bold))
                     .foregroundStyle(usageColor)
             }
-            ProgressView(value: window.usedPercent, total: 100)
-                .tint(usageColor)
-                .controlSize(.mini)
+            GaugeBar(value: window.usedPercent, tint: usageColor)
             HStack {
-                Text("\(format(window.remainingPercent))% left")
+                Text("\(format(window.remainingPercent))% LEFT")
                 Spacer()
-                Text(resetLabel)
+                Text(resetLabel.uppercased())
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            .font(ConsoleTheme.mono(.caption2))
+            .foregroundStyle(ConsoleTheme.secondary)
             .lineLimit(1)
-            .minimumScaleFactor(0.72)
+            .minimumScaleFactor(0.7)
         }
     }
 
-    private var percentLabel: String { "\(format(window.usedPercent))% used" }
+    private var percentLabel: String { "\(format(window.usedPercent))% USED" }
 
     private var usageColor: Color {
         switch window.usedPercent {
