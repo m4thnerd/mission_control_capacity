@@ -177,6 +177,18 @@ public struct PTYUsageProbe: Sendable {
         esac
 
         sleep 5
+        if [[ "$kind" == "anthropic" ]]; then
+            # Claude Code asks whether to trust an unfamiliar folder before it shows
+            # a prompt, and the default answer is "No, exit". The probe workspace is
+            # an empty app-owned directory, so accept it and wait for the prompt.
+            screen="$(run_bounded "$tmux_bin" -L "$socket" capture-pane -p -t "$session" 2>/dev/null || true)"
+            if [[ "$screen" == *"trust this folder"* ]]; then
+                run_bounded "$tmux_bin" -L "$socket" send-keys -t "$session" Down || exit $?
+                sleep 0.3
+                run_bounded "$tmux_bin" -L "$socket" send-keys -t "$session" Enter || exit $?
+                sleep 4
+            fi
+        fi
         run_bounded "$tmux_bin" -L "$socket" send-keys -t "$session" -l /usage || exit $?
         run_bounded "$tmux_bin" -L "$socket" send-keys -t "$session" Enter || exit $?
         if [[ "$kind" == "cursor" ]]; then
