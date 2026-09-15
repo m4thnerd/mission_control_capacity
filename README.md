@@ -71,6 +71,12 @@ Build a menu-bar app bundle:
 open ".build/Mission Control Capacity.app"
 ```
 
+Render the menu-bar dashboard from the cached snapshot to a PNG, to check layout changes without clicking the menu bar item:
+
+```bash
+swift run MissionControlCapacity --render-preview dashboard.png
+```
+
 Run the unit tests:
 
 ```bash

@@ -5,32 +5,42 @@ import SwiftUI
 struct DashboardView: View {
     @ObservedObject var store: CapacityStore
     let compact: Bool
+    /// Renders the card grid without a ScrollView. Used by the preview renderer,
+    /// which cannot draw scroll views or lazy containers.
+    var staticLayout = false
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            GeometryReader { proxy in
-                let cardHeight = max(180, (proxy.size.height - 30) / 2)
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
-                    ForEach(visibleSnapshots) { snapshot in
-                        ProviderCard(snapshot: snapshot)
-                            .frame(height: cardHeight, alignment: .top)
-                    }
-                }
-                .padding(10)
+            if staticLayout {
+                cardGrid
+            } else {
+                ScrollView { cardGrid }
             }
             Divider()
             footer
         }
         .background(.regularMaterial)
+    }
+
+    private var cardGrid: some View {
+        let rows = stride(from: 0, to: visibleSnapshots.count, by: 2).map {
+            Array(visibleSnapshots[$0..<min($0 + 2, visibleSnapshots.count)])
+        }
+        return VStack(spacing: 10) {
+            ForEach(rows, id: \.first!.id) { row in
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(row) { snapshot in
+                        ProviderCard(snapshot: snapshot)
+                            .frame(maxWidth: .infinity, minHeight: 250)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(10)
     }
 
     private var header: some View {
@@ -176,13 +186,14 @@ private struct ProviderCard: View {
                 }
             }
             Spacer(minLength: 0)
+            BestForSection(guide: ProviderGuide.forProvider(snapshot.id), tint: providerColor)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.background.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(.separator.opacity(0.35), lineWidth: 1)
+                .stroke(providerColor.opacity(0.6), lineWidth: 1.5)
         }
     }
 
@@ -226,6 +237,43 @@ private struct ProviderCard: View {
         if seconds < 3_600 { return "Stale · last good update \(seconds / 60)m ago" }
         if seconds < 86_400 { return "Stale · last good update \(seconds / 3_600)h ago" }
         return "Stale · last good update \(seconds / 86_400)d ago"
+    }
+}
+
+private struct BestForSection: View {
+    let guide: ProviderGuide
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "scope")
+                    .font(.system(size: 9, weight: .bold))
+                Text("BEST FOR")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.8)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(tint)
+            Text(guide.headline)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            ForEach(guide.bestFor, id: \.self) { item in
+                HStack(alignment: .top, spacing: 4) {
+                    Text("•")
+                    Text(item)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .help("What this provider's models are generally known to be strongest at. Use it to pick where the next project goes, or where to shift when a limit runs out.")
     }
 }
 

@@ -5,10 +5,14 @@ import SwiftUI
 struct MissionControlCapacityApp: App {
     @StateObject private var store = CapacityStore()
 
+    init() {
+        PreviewRenderer.runIfRequested()
+    }
+
     var body: some Scene {
         MenuBarExtra {
             DashboardView(store: store, compact: true)
-                .frame(width: 430, height: 650)
+                .frame(width: 430, height: 800)
                 .onAppear { store.start() }
         } label: {
             Label("Capacity", systemImage: menuBarSymbol)
@@ -17,10 +21,10 @@ struct MissionControlCapacityApp: App {
 
         Window("Mission Control: Capacity", id: "dashboard") {
             DashboardView(store: store, compact: false)
-                .frame(minWidth: 480, minHeight: 620)
+                .frame(minWidth: 480, minHeight: 760)
                 .onAppear { store.start() }
         }
-        .defaultSize(width: 520, height: 720)
+        .defaultSize(width: 520, height: 860)
     }
 
     private var menuBarSymbol: String {
