@@ -108,6 +108,7 @@ struct DashboardView: View {
                 }
             }
             Spacer()
+            ThemePicker { Text("THEME ▾") }
             Text("POLL 10M")
                 .foregroundStyle(ConsoleTheme.tertiary)
             if compact {

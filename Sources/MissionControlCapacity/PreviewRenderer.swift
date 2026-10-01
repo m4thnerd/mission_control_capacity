@@ -1,25 +1,51 @@
 import AppKit
 import SwiftUI
 
-/// Developer aid: `MissionControlCapacity --render-preview out.png` renders the
-/// menu-bar dashboard from the cached snapshot to a PNG and exits, so layout
-/// changes can be checked without clicking the menu bar item.
+/// Developer aid that renders a view from the cached snapshot to a PNG and exits,
+/// so layout changes can be checked without opening the app:
+/// `--render-preview out.png` draws the menu-bar popover and
+/// `--render-dashboard out.png` the dashboard window. Add
+/// `-dashboardTheme <theme>` (e.g. `orbital`) to pick a theme for this run only.
 enum PreviewRenderer {
     @MainActor
     static func runIfRequested() {
         let arguments = CommandLine.arguments
-        guard let flag = arguments.firstIndex(of: "--render-preview"),
-              arguments.indices.contains(flag + 1) else { return }
-        let output = URL(fileURLWithPath: arguments[flag + 1])
+        guard let (flag, output) = request(in: arguments) else { return }
+        let capacity = CapacityStore(service: .live)
+        let missions = MissionStore()
+        let theme = UserDefaults.standard.string(forKey: DashboardTheme.storageKey)
+            .flatMap(DashboardTheme.init(rawValue:)) ?? .default
 
-        let store = CapacityStore(service: .live)
-        let view = DashboardView(store: store, compact: true, staticLayout: true)
-            .frame(width: 430)
-            .fixedSize(horizontal: false, vertical: true)
-            .background(ConsoleTheme.background)
+        if flag == "--render-preview" {
+            render(
+                ThemedMenu(capacity: capacity, missions: missions, staticLayout: true)
+                    .frame(width: 430)
+                    .fixedSize(horizontal: false, vertical: true),
+                to: output
+            )
+        } else {
+            let size = theme.showsMissions ? CGSize(width: 1440, height: 900) : CGSize(width: 520, height: 860)
+            render(
+                ThemedDashboard(capacity: capacity, missions: missions, staticLayout: true)
+                    .frame(width: size.width, height: size.height),
+                to: output
+            )
+        }
+    }
+
+    private static func request(in arguments: [String]) -> (String, URL)? {
+        for flag in ["--render-preview", "--render-dashboard"] {
+            if let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) {
+                return (flag, URL(fileURLWithPath: arguments[index + 1]))
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private static func render(_ view: some View, to output: URL) -> Never {
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
-
         guard let image = renderer.nsImage,
               let tiff = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),
