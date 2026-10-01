@@ -16,7 +16,7 @@ public enum UsageParsers {
         }
 
         return ProviderSnapshot(
-            id: .cursor,
+            provider: .cursor,
             state: .connected,
             plan: plan,
             windows: [
@@ -66,7 +66,7 @@ public enum UsageParsers {
             )
         ]
         return ProviderSnapshot(
-            id: .google,
+            provider: .google,
             state: .connected,
             plan: plan,
             windows: windows,
@@ -102,7 +102,7 @@ public enum UsageParsers {
         }
         guard !windows.isEmpty else { throw ParserError.missingUsage("Claude") }
         return ProviderSnapshot(
-            id: .anthropic,
+            provider: .anthropic,
             state: .connected,
             plan: plan,
             windows: windows,
@@ -179,7 +179,7 @@ public enum UsageParsers {
         }
 
         return ProviderSnapshot(
-            id: .openAI,
+            provider: .openAI,
             state: .connected,
             plan: detectedPlan,
             windows: windows,

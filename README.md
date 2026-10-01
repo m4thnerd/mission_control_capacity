@@ -44,6 +44,28 @@ The app never reads or stores raw credentials. It asks each already-authenticate
 
 Interactive usage screens are captured in private, short-lived `tmux` sessions with unique `mcc-…` names. The app closes only the session it created and never touches an existing user session.
 
+## Multiple accounts per provider
+
+Claude Code and Codex each keep one login per config folder (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`). To track several accounts, list them in `~/Library/Application Support/Mission Control Capacity/accounts.json`:
+
+```json
+{
+  "accounts": [
+    { "id": "openai", "provider": "openAI", "label": "OpenAI" },
+    { "id": "claude-main", "provider": "anthropic", "label": "Claude · Main" },
+    { "id": "claude-work", "provider": "anthropic", "label": "Claude · Work", "configDirectory": "~/.claude-accounts/work" }
+  ]
+}
+```
+
+Omit `configDirectory` to use the CLI's default login. Sign in to each extra folder once:
+
+```bash
+CLAUDE_CONFIG_DIR=~/.claude-accounts/work claude auth login
+```
+
+Without this file, every provider is polled once with its default login. Cursor and Antigravity support only their default login.
+
 ## Verify live adapters
 
 ```bash
@@ -89,7 +111,7 @@ On a Mac with only the Command Line Tools (no Xcode), the toolchain does not loa
 swift test -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
 ```
 
-The bundle uses `LSUIElement`, so it appears in the menu bar without occupying the Dock. Clicking **Open Dashboard** opens a persistent window. Provider data polls in the background every 10 minutes and is stored locally in `~/Library/Application Support/Mission Control Capacity/capacity-snapshot.json`, so reopening the widget is instant. Failed providers retry after one minute. Their last good measurements remain visible but are explicitly marked stale; the refresh button still forces an immediate poll.
+The bundle uses `LSUIElement`, so it appears in the menu bar without occupying the Dock. Clicking **Open Dashboard** opens a persistent window. Provider data polls in the background every 10 minutes and is stored locally in `~/Library/Application Support/Mission Control Capacity/capacity-snapshot-v2.json`, so reopening the widget is instant. Failed providers retry after one minute. Their last good measurements remain visible but are explicitly marked stale; the refresh button still forces an immediate poll.
 
 ## Notes
 

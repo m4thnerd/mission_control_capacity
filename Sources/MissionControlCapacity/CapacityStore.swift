@@ -14,9 +14,18 @@ final class CapacityStore: ObservableObject {
     init(service: CapacityService = .live) {
         self.service = service
         let cached = CapacityCache.load()
-        self.snapshots = cached.map(Self.validatedCachedSnapshots)
-            ?? ProviderID.allCases.map(ProviderSnapshot.loading)
-        self.lastRefresh = cached?.lastPolledAt
+        let cachedByAccount = Dictionary(
+            (cached.map(Self.validatedCachedSnapshots) ?? []).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        // Follow accounts.json: drop cached accounts that were removed and show
+        // newly added ones as loading until their first refresh.
+        self.snapshots = service.accounts.map { account in
+            cachedByAccount[account.id]?.assigned(to: account) ?? .loading(account)
+        }
+        self.lastRefresh = service.accounts.allSatisfy { cachedByAccount[$0.id] != nil }
+            ? cached?.lastPolledAt
+            : nil
 
         // MenuBarExtra content is created only when clicked. Start here instead so
         // stale snapshots refresh while the app remains quietly in the menu bar.
@@ -31,7 +40,8 @@ final class CapacityStore: ObservableObject {
                 return snapshot
             }
             let failure = ProviderSnapshot(
-                id: snapshot.id,
+                provider: snapshot.provider,
+                account: snapshot.account,
                 state: .error,
                 message: "Recent checks did not produce a successful update."
             )

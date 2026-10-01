@@ -86,7 +86,8 @@ public struct CapacityMetric: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct ProviderSnapshot: Codable, Identifiable, Sendable {
-    public let id: ProviderID
+    public let provider: ProviderID
+    public let account: AccountRef
     public let state: ConnectionState
     public let plan: String?
     public let windows: [CapacityWindow]
@@ -94,8 +95,11 @@ public struct ProviderSnapshot: Codable, Identifiable, Sendable {
     public let message: String?
     public let updatedAt: Date
 
+    public var id: String { account.id }
+
     public init(
-        id: ProviderID,
+        provider: ProviderID,
+        account: AccountRef? = nil,
         state: ConnectionState,
         plan: String? = nil,
         windows: [CapacityWindow] = [],
@@ -103,7 +107,8 @@ public struct ProviderSnapshot: Codable, Identifiable, Sendable {
         message: String? = nil,
         updatedAt: Date = Date()
     ) {
-        self.id = id
+        self.provider = provider
+        self.account = account ?? .primary(provider)
         self.state = state
         self.plan = plan
         self.windows = windows
@@ -112,8 +117,31 @@ public struct ProviderSnapshot: Codable, Identifiable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    public static func loading(_ id: ProviderID) -> ProviderSnapshot {
-        ProviderSnapshot(id: id, state: .loading)
+    public static func loading(_ account: AccountConfig) -> ProviderSnapshot {
+        ProviderSnapshot(provider: account.provider, account: account.ref, state: .loading)
+    }
+
+    /// The same measurements attributed to `config`, keeping any identity the
+    /// provider already reported.
+    public func assigned(to config: AccountConfig) -> ProviderSnapshot {
+        withAccount(AccountRef(id: config.id, label: config.label, identity: account.identity))
+    }
+
+    public func identified(as identity: String?) -> ProviderSnapshot {
+        withAccount(AccountRef(id: account.id, label: account.label, identity: identity))
+    }
+
+    private func withAccount(_ account: AccountRef) -> ProviderSnapshot {
+        ProviderSnapshot(
+            provider: provider,
+            account: account,
+            state: state,
+            plan: plan,
+            windows: windows,
+            metrics: metrics,
+            message: message,
+            updatedAt: updatedAt
+        )
     }
 
     /// Keeps the last successful measurements when a transient refresh fails,
@@ -127,7 +155,8 @@ public struct ProviderSnapshot: Codable, Identifiable, Sendable {
             "Latest refresh failed."
         }
         return ProviderSnapshot(
-            id: id,
+            provider: provider,
+            account: account,
             state: .error,
             plan: plan,
             windows: windows,

@@ -36,6 +36,6 @@ enum CapacityCache {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base
             .appendingPathComponent("Mission Control Capacity", isDirectory: true)
-            .appendingPathComponent("capacity-snapshot.json", isDirectory: false)
+            .appendingPathComponent("capacity-snapshot-v2.json", isDirectory: false)
     }
 }

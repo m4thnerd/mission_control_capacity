@@ -142,7 +142,7 @@ struct DashboardView: View {
     }
 
     private var visibleSnapshots: [ProviderSnapshot] {
-        store.snapshots.filter { $0.id != .xAI }
+        store.snapshots.filter { $0.provider != .xAI }
     }
 }
 
@@ -226,7 +226,7 @@ private struct ProviderCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 GlowDot(color: statusColor)
-                Text(snapshot.id.shortName.uppercased())
+                Text(snapshot.account.label.uppercased())
                     .font(ConsoleTheme.mono(.callout, weight: .bold))
                     .tracking(1)
                     .lineLimit(1)
@@ -248,6 +248,14 @@ private struct ProviderCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
+            }
+
+            if let identity = snapshot.account.identity {
+                Text(identity)
+                    .font(ConsoleTheme.mono(.caption2))
+                    .foregroundStyle(ConsoleTheme.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             if snapshot.state == .error, !snapshot.windows.isEmpty {
@@ -300,7 +308,7 @@ private struct ProviderCard: View {
                 }
             }
             Spacer(minLength: 0)
-            BestForSection(guide: ProviderGuide.forProvider(snapshot.id), tint: providerColor)
+            BestForSection(guide: ProviderGuide.forProvider(snapshot.provider), tint: providerColor)
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -323,7 +331,7 @@ private struct ProviderCard: View {
     }
 
     private var providerColor: Color {
-        switch snapshot.id {
+        switch snapshot.provider {
         case .openAI: .mint
         case .anthropic: .orange
         case .google: .blue
@@ -343,7 +351,7 @@ private struct ProviderCard: View {
     }
 
     private func displayPlan(_ plan: String) -> String {
-        snapshot.id == .google ? plan.replacingOccurrences(of: "Google ", with: "") : plan
+        snapshot.provider == .google ? plan.replacingOccurrences(of: "Google ", with: "") : plan
     }
 
     private func staleLabel(now: Date) -> String {
