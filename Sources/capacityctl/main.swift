@@ -39,7 +39,8 @@ struct CapacityCLI {
 
         for snapshot in snapshots {
             let plan = snapshot.plan.map { " · \($0)" } ?? ""
-            print("\n\(snapshot.id.displayName) — \(snapshot.state.label)\(plan)")
+            let identity = snapshot.account.identity.map { " · \($0)" } ?? ""
+            print("\n\(snapshot.account.label) (\(snapshot.provider.displayName)) — \(snapshot.state.label)\(plan)\(identity)")
             for window in snapshot.windows {
                 let reset = window.resetsAt.map { $0.formatted(date: .abbreviated, time: .shortened) }
                     ?? window.resetDescription

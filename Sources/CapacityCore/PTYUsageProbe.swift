@@ -12,21 +12,31 @@ public struct PTYUsageProbe: Sendable {
 
     public init() {}
 
-    public func run(kind: PTYProbeKind, executable: URL) async throws -> String {
+    /// `environment` selects the account, e.g. `CLAUDE_CONFIG_DIR` for a second
+    /// Claude login. It reaches the CLI through the probe's private tmux server.
+    public func run(
+        kind: PTYProbeKind,
+        executable: URL,
+        environment: [String: String] = [:]
+    ) async throws -> String {
         if kind == .openAI {
-            return try await runOpenAI(executable: executable)
+            return try await runOpenAI(executable: executable, environment: environment)
         }
         do {
-            return try await runInteractive(kind: kind, executable: executable)
+            return try await runInteractive(kind: kind, executable: executable, environment: environment)
         } catch {
             // Terminal UIs can occasionally miss their first readiness window.
             // Background polling makes one clean, isolated retry inexpensive.
             try await Task.sleep(nanoseconds: 1_000_000_000)
-            return try await runInteractive(kind: kind, executable: executable)
+            return try await runInteractive(kind: kind, executable: executable, environment: environment)
         }
     }
 
-    private func runInteractive(kind: PTYProbeKind, executable: URL) async throws -> String {
+    private func runInteractive(
+        kind: PTYProbeKind,
+        executable: URL,
+        environment: [String: String]
+    ) async throws -> String {
         guard let tmux = ExecutableLocator().locate("tmux") else {
             throw CommandRunnerError.executableMissing("tmux")
         }
@@ -51,13 +61,13 @@ public struct PTYUsageProbe: Sendable {
             let result = try await runner.run(
                 executable: shell,
                 arguments: ["-c", Self.interactiveProbeScript],
-                environment: [
+                environment: environment.merging([
                     "MCC_PROBE_KIND": kind.rawValue,
                     "MCC_PROBE_EXECUTABLE": executable.path,
                     "MCC_PROBE_SOCKET": socket,
                     "MCC_PROBE_TMUX": tmux.path,
                     "MCC_PROBE_WORKDIR": Self.probeWorkingDirectory
-                ],
+                ]) { _, probe in probe },
                 timeout: 45
             )
             await killOrphan(socket)
@@ -71,7 +81,7 @@ public struct PTYUsageProbe: Sendable {
         }
     }
 
-    private func runOpenAI(executable: URL) async throws -> String {
+    private func runOpenAI(executable: URL, environment: [String: String]) async throws -> String {
         guard let expect = ExecutableLocator().locate("expect") else {
             throw CommandRunnerError.executableMissing("expect")
         }
@@ -79,10 +89,10 @@ public struct PTYUsageProbe: Sendable {
         let result = try await runner.run(
             executable: expect,
             arguments: ["-c", Self.openAIExpectScript],
-            environment: [
+            environment: environment.merging([
                 "MCC_PROBE_EXECUTABLE": executable.path,
                 "MCC_PROBE_WORKDIR": Self.probeWorkingDirectory
-            ],
+            ]) { _, probe in probe },
             timeout: 15
         )
         guard result.exitCode == 0 else {

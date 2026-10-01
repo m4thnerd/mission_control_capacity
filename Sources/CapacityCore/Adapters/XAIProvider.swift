@@ -1,13 +1,15 @@
 import Foundation
 
 public struct XAIProvider: CapacityProvider {
-    public let id: ProviderID = .xAI
+    public let account: AccountConfig
 
-    public init() {}
+    public init(account: AccountConfig = .primary(.xAI)) {
+        self.account = account
+    }
 
     public func fetch() async -> ProviderSnapshot {
         ProviderSnapshot(
-            id: id,
+            provider: .xAI,
             state: .unavailable,
             message: "Not configured. Cursor-hosted Grok usage appears under Cursor."
         )

@@ -4,6 +4,8 @@ import SwiftUI
 @main
 struct MissionControlCapacityApp: App {
     @StateObject private var store = CapacityStore()
+    @StateObject private var missions = MissionStore()
+    @AppStorage(DashboardTheme.storageKey) private var theme = DashboardTheme.default
 
     init() {
         PreviewRenderer.runIfRequested()
@@ -11,20 +13,27 @@ struct MissionControlCapacityApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            DashboardView(store: store, compact: true)
-                .frame(width: 430, height: 800)
+            ThemedMenu(capacity: store, missions: missions)
+                .frame(width: 430, height: theme.showsMissions ? 760 : 800)
                 .onAppear { store.start() }
         } label: {
             Label("Capacity", systemImage: menuBarSymbol)
         }
         .menuBarExtraStyle(.window)
 
-        Window("Mission Control: Capacity", id: "dashboard") {
-            DashboardView(store: store, compact: false)
-                .frame(minWidth: 480, minHeight: 760)
+        Window("Mission Control", id: "dashboard") {
+            ThemedDashboard(capacity: store, missions: missions)
                 .onAppear { store.start() }
         }
-        .defaultSize(width: 520, height: 860)
+        .defaultSize(width: theme.showsMissions ? 1440 : 520, height: theme.showsMissions ? 900 : 860)
+        .commands {
+            CommandMenu("Theme") {
+                Picker("Theme", selection: $theme) {
+                    ForEach(DashboardTheme.allCases) { Text($0.displayName).tag($0) }
+                }
+                .pickerStyle(.inline)
+            }
+        }
     }
 
     private var menuBarSymbol: String {

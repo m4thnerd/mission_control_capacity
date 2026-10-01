@@ -1,15 +1,17 @@
 import Foundation
 
 public struct GoogleProvider: CapacityProvider {
-    public let id: ProviderID = .google
+    public let account: AccountConfig
     private let locator = ExecutableLocator()
     private let probe = PTYUsageProbe()
 
-    public init() {}
+    public init(account: AccountConfig = .primary(.google)) {
+        self.account = account
+    }
 
     public func fetch() async -> ProviderSnapshot {
         guard let executable = locator.locate("agy") else {
-            return ProviderSnapshot(id: id, state: .unavailable, message: "Antigravity CLI (agy) is not installed.")
+            return ProviderSnapshot(provider: .google, state: .unavailable, message: "Antigravity CLI (agy) is not installed.")
         }
         do {
             return try UsageParsers.google(try await probe.run(kind: .google, executable: executable))
@@ -17,7 +19,7 @@ public struct GoogleProvider: CapacityProvider {
             let state: ConnectionState = error.localizedDescription.localizedCaseInsensitiveContains("authenticate")
                 ? .unauthenticated
                 : .error
-            return ProviderSnapshot(id: id, state: state, message: error.localizedDescription)
+            return ProviderSnapshot(provider: .google, state: state, message: error.localizedDescription)
         }
     }
 }

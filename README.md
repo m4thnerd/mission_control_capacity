@@ -44,6 +44,36 @@ The app never reads or stores raw credentials. It asks each already-authenticate
 
 Interactive usage screens are captured in private, short-lived `tmux` sessions with unique `mcc-…` names. The app closes only the session it created and never touches an existing user session.
 
+## Themes, projects, objectives and tasks
+
+Pick a look from the theme picker in the dashboard or the menu-bar popover. **Console**, the original capacity view, is the default. The other themes turn the dashboard into a full mission panel:
+
+- Flight Deck · Flight Manual · Orbital · Ops Board · Instrument Panel · Glass Cockpit · Departure Board · Blueprint · Analog Cockpit · Daily Briefing · Assistant HUD
+
+Every mission-panel theme shows the same things: a gauge set for each account's 5-hour and weekly windows, which Claude account has the most headroom (route your next session there), a caution when any account passes 85%, and your projects, objectives and Now/Next/Later tasks. Add items with **+**, double-click or right-click to edit, move or delete, and flip a task's switch to complete it. They are saved to `~/Library/Application Support/Mission Control Capacity/missions.json`.
+
+## Multiple accounts per provider
+
+Claude Code and Codex each keep one login per config folder (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`). To track several accounts, list them in `~/Library/Application Support/Mission Control Capacity/accounts.json`:
+
+```json
+{
+  "accounts": [
+    { "id": "openai", "provider": "openAI", "label": "OpenAI" },
+    { "id": "claude-main", "provider": "anthropic", "label": "Claude · Main" },
+    { "id": "claude-work", "provider": "anthropic", "label": "Claude · Work", "configDirectory": "~/.claude-accounts/work" }
+  ]
+}
+```
+
+Omit `configDirectory` to use the CLI's default login. Sign in to each extra folder once:
+
+```bash
+CLAUDE_CONFIG_DIR=~/.claude-accounts/work claude auth login
+```
+
+Without this file, every provider is polled once with its default login. Cursor and Antigravity support only their default login.
+
 ## Verify live adapters
 
 ```bash
@@ -74,8 +104,11 @@ open ".build/Mission Control Capacity.app"
 Render the menu-bar dashboard from the cached snapshot to a PNG, to check layout changes without clicking the menu bar item:
 
 ```bash
-swift run MissionControlCapacity --render-preview dashboard.png
+swift run MissionControlCapacity --render-preview menu.png
+swift run MissionControlCapacity --render-dashboard dashboard.png
 ```
+
+Add `-dashboardTheme orbital` (or any theme) to render a specific theme without changing your saved choice.
 
 Run the unit tests:
 
@@ -89,7 +122,7 @@ On a Mac with only the Command Line Tools (no Xcode), the toolchain does not loa
 swift test -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
 ```
 
-The bundle uses `LSUIElement`, so it appears in the menu bar without occupying the Dock. Clicking **Open Dashboard** opens a persistent window. Provider data polls in the background every 10 minutes and is stored locally in `~/Library/Application Support/Mission Control Capacity/capacity-snapshot.json`, so reopening the widget is instant. Failed providers retry after one minute. Their last good measurements remain visible but are explicitly marked stale; the refresh button still forces an immediate poll.
+The bundle uses `LSUIElement`, so it appears in the menu bar without occupying the Dock. Clicking **Open Dashboard** opens a persistent window. Provider data polls in the background every 10 minutes and is stored locally in `~/Library/Application Support/Mission Control Capacity/capacity-snapshot-v2.json`, so reopening the widget is instant. Failed providers retry after one minute. Their last good measurements remain visible but are explicitly marked stale; the refresh button still forces an immediate poll.
 
 ## Notes
 
